@@ -5,7 +5,7 @@
 
 .NOTES  
 Author: Andrey Zvorygin
-Version: 1.1.1 (2024-05-03) 
+Version: 1.1.2 (2024-05-03) 
 
 .PARAMETER Path
 Список каталогов, в которых находится ЭФП, который нужно проверить
@@ -46,7 +46,7 @@ Version: 1.1.1 (2024-05-03)
 .PARAMETER ImageMagickDirectory
 Путь до директории с исполняемыми файлами ImageMagick, указывается только совместно с параметром CheckImageFiles
 
-.PARAMETER ErrorLogPath
+.PARAMETER LogPath
 Путь к файлу с журналом ошибок
 
 .PARAMETER ContinueOnError
@@ -69,7 +69,7 @@ param (
     [Parameter(Mandatory = $false)] [string]$DirectoryDelimiter = "-",
     [Parameter(Mandatory = $false)] [switch]$CheckImageFiles,
     [Parameter(Mandatory = $false)] [string]$ImageMagickDirectory,
-    [Parameter(Mandatory = $false)] [string]$ErrorLogPath,
+    [Parameter(Mandatory = $false)] [string]$LogPath,
     [Parameter(Mandatory = $false)] [switch]$ContinueOnError = $false
 )
 
@@ -80,19 +80,49 @@ if ($CheckImageFiles) {
     $ImageMagickExecutablePath = $ImageMagickDirectory ? (Join-Path -Path "${ImageMagickDirectory}" -ChildPath "magick.exe") : (Get-Command -Name "magick.exe" -ErrorAction Stop).Path
 }
 
+enum LogLevel {
+    INFO
+    ERROR
+    VERBOSE
+    DEBUG
+}
+Set-Variable -Name VerboseLogging -Value ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) -Option ReadOnly -Scope Private -Force
+Set-Variable -Name DebugLogging -Value ($PSCmdlet.MyInvocation.BoundParameters["Debug"].IsPresent) -Option ReadOnly -Scope Private -Force
+
 function Show-Check-Error {
     param(
-        [Parameter(Mandatory = $true)] $Message,
+        [Parameter(Mandatory = $true)] [string]$Message,
+        [Parameter(Mandatory = $false)] [LogLevel]$LogLevel = [LogLevel]::ERROR,
         [Parameter(Mandatory = $false)] [switch]$ForceContinue = $false
     )
 
-    $Message = "[" + (Get-Date).ToString() + "] " + $Message
+    $WriteToFile = $true
+    $Message = "[" + (Get-Date).ToString() + "] ${LogLevel}: " + $Message
 
-    Write-Error "${Message}"
-    if ($ErrorLogPath) {
-        Add-Content -Path "${ErrorLogPath}" -Value "${Message}"
+    switch ($LogLevel) {
+        INFO {
+            Write-Host "${Message}"
+        }
+        DEBUG {
+            $WriteToFile = $DebugLogging
+            Write-Debug "${Message}"
+        }
+        VERBOSE {
+            $WriteToFile = $VerboseLogging
+            Write-Verbose "${Message}"
+        }
+        ERROR {
+            Write-Error "${Message}"
+        }
+        Default {
+            Write-Error "${Message}"
+        }
     }
-    if ((-not $ContinueOnError) -and (-not $ForceContinue)) {
+
+    if ($LogPath -and $WriteToFile) {
+        Add-Content -Path "${LogPath}" -Value "${Message}"
+    }
+    if (($LogLevel -eq "ERROR") -and (-not $ContinueOnError) -and (-not $ForceContinue)) {
         throw
     }
 }
@@ -112,7 +142,7 @@ function Test-Directory {
         [Parameter(Mandatory = $true)] $StartsWith
     )
     
-    Write-Host "Checking ${Path}"
+    Show-Check-Error -Message "Check ${Path}" -LogLevel INFO
 
     $Directory = [System.IO.DirectoryInfo]"${Path}"
 
@@ -142,7 +172,7 @@ function Test-Images {
 
     Process {
         $File = [System.IO.FileInfo]$ImageFile
-        Write-Verbose -Message "Checking ${File}"
+        Show-Check-Error -Message "Check ${File}" -LogLevel VERBOSE
 
         if (-not $File.Exists) {
             Show-Check-Error -Message "${File} is not a file"
@@ -159,17 +189,17 @@ function Test-Images {
         }
 
         if ($CheckImageFiles) {
-            Write-Verbose -Message "Checking image file ${File} with imagemagick"
+            Show-Check-Error -Message "Check image file ${File} with imagemagick" -LogLevel VERBOSE
             & "${ImageMagickExecutablePath}" identify -regard-warnings "${File}" 2>&1>$null
             if ($LASTEXITCODE -ne 0) {
                 Show-Check-Error -Message "File ${File} is corrupted. Please check it"
             }
             else {
-                Write-Verbose -Message "File ${File} is correct image file"
+                Show-Check-Error -Message "File ${File} is correct image file" -LogLevel VERBOSE
             }
         }
 
-        Write-Verbose -Message "${File} is successfully checked"
+        Show-Check-Error -Message "${File} is successfully checked" -LogLevel VERBOSE
         $ImageIndex++
     }
 }
@@ -188,7 +218,7 @@ function Test-Unit-In-Destination-Path {
     
         $DestinationPath | ForEach-Object {
             $Directory = [System.IO.DirectoryInfo](Join-Path -Path "${_}" -ChildPath "${FundDirectoryName}" -AdditionalChildPath "${InventoryDirectoryName}", "${UnitDirectoryName}")
-            Write-Verbose "Checking if ${Path} is exists in ${Directory}"
+            Show-Check-Error -Message "Check if ${Path} is exists in ${Directory}" -LogLevel VERBOSE
             if ($Directory.Exists) {
                 Show-Check-Error -Message "${Directory} already exists"
             }
@@ -204,7 +234,7 @@ function Test-Units {
 
     Process {
         if ($UnitDirectory.BaseName -in $ExcludePaths) {
-            Show-Check-Error -Message "Skip ${UnitDirectory}" -ForceContinue
+            Show-Check-Error -Message "Skip ${UnitDirectory}" -LogLevel INFO
         } else {
             Test-Unit-In-Destination-Path -Path "${UnitDirectory}"
             Test-Directory -Path "${UnitDirectory}" -Mask "${UnitMask}" -StartsWith $UnitDirectory.Parent.BaseName
@@ -221,7 +251,7 @@ function Test-Inventories {
 
     Process {
         if ($InventoryDirectory.BaseName -in $ExcludePaths) {
-            Show-Check-Error -Message "Skip ${InventoryDirectory}" -ForceContinue
+            Show-Check-Error -Message "Skip ${InventoryDirectory}" -LogLevel INFO
         } else {
             Test-Directory -Path "${InventoryDirectory}" -Mask "${InventoryMask}" -StartsWith $InventoryDirectory.Parent.BaseName
             return Get-SortedDirectory -Path $InventoryDirectory
@@ -237,7 +267,7 @@ function Test-Funds {
 
     Process {
         if ($FundDirectory.BaseName -in $ExcludePaths) {
-            Show-Check-Error -Message "Skip ${FundDirectory}" -ForceContinue
+            Show-Check-Error -Message "Skip ${FundDirectory}" -LogLevel INFO
         } else {
             Test-Directory -Path "${FundDirectory}" -Mask "${FundMask}" -StartsWith ""
             return Get-SortedDirectory -Path $FundDirectory
@@ -256,6 +286,6 @@ function Test-SourceDirectory {
     }
 }
 
-Show-Check-Error -Message "Start" -ForceContinue
+Show-Check-Error -Message "Start" -LogLevel INFO
 $Path | Test-SourceDirectory | Test-Funds | Test-Inventories | Test-Units
-Show-Check-Error -Message "End" -ForceContinue
+Show-Check-Error -Message "End" -LogLevel INFO
