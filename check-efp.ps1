@@ -5,13 +5,16 @@
 
 .NOTES  
 Author: Andrey Zvorygin
-Version: 1.0.2 (2024-05-03) 
+Version: 1.1.0 (2024-05-03) 
 
 .PARAMETER Path
 Список каталогов, в которых находится ЭФП, который нужно проверить
 
 .PARAMETER DestinationPath
 Список каталогов, в которых находится обработанный ЭФП. Если этот параметр указан, то происходит проверка наличия проверяемого дела в хранилище
+
+.PARAMETER ExcludePaths
+Список каталогов, которые игнорируются при проверке
 
 .PARAMETER FileExtensions
 Список допустимых расширений файлов
@@ -34,6 +37,9 @@ Version: 1.0.2 (2024-05-03)
 .PARAMETER UnitMask
 Маска имени директории дела в формате regex, при проверке складывается с параметрами FundMask и InventoryMask. Символы ^ и $ указывать не нужно
 
+.PARAMETER DirectoryDelimiter
+Разделитель фонда, описи, дела в имени директории с архивным шифром
+
 .PARAMETER CheckImageFiles
 Нужно ли проверять файлы изображений на корректность
 
@@ -52,6 +58,7 @@ Version: 1.0.2 (2024-05-03)
 param (
     [Parameter(Mandatory = $true)] [string[]]$Path,
     [Parameter(Mandatory = $false)] [string[]]$DestinationPath,
+    [Parameter(Mandatory = $false)] [string[]]$ExcludePaths,
     [Parameter(Mandatory = $false)] [string[]]$FileExtensions = @(".jpg"),
     [Parameter(Mandatory = $false)] [int]$NumberLength = 6,
     [Parameter(Mandatory = $false)] [switch]$AddPrefix,
@@ -196,9 +203,11 @@ function Test-Units {
     )
 
     Process {
-        Test-Unit-In-Destination-Path -Path "${UnitDirectory}"
-        Test-Directory -Path "${UnitDirectory}" -Mask "${UnitMask}" -StartsWith $UnitDirectory.Parent.BaseName
-        Get-SortedDirectory -Path $UnitDirectory | Test-Images
+        if (-not ($UnitDirectory.BaseName -in $ExcludePaths)) {
+            Test-Unit-In-Destination-Path -Path "${UnitDirectory}"
+            Test-Directory -Path "${UnitDirectory}" -Mask "${UnitMask}" -StartsWith $UnitDirectory.Parent.BaseName
+            Get-SortedDirectory -Path $UnitDirectory | Test-Images
+        }
     }
 }
 
@@ -209,8 +218,10 @@ function Test-Inventories {
     )
 
     Process {
-        Test-Directory -Path "${InventoryDirectory}" -Mask "${InventoryMask}" -StartsWith $InventoryDirectory.Parent.BaseName
-        return Get-SortedDirectory -Path $InventoryDirectory
+        if (-not ($InventoryDirectory.BaseName -in $ExcludePaths)) {
+            Test-Directory -Path "${InventoryDirectory}" -Mask "${InventoryMask}" -StartsWith $InventoryDirectory.Parent.BaseName
+            return Get-SortedDirectory -Path $InventoryDirectory
+        }
     }
 }
 
@@ -221,8 +232,10 @@ function Test-Funds {
     )
 
     Process {
-        Test-Directory -Path "${FundDirectory}" -Mask "${FundMask}" -StartsWith ""
-        return Get-SortedDirectory -Path $FundDirectory
+        if (-not ($FundDirectory.BaseName -in $ExcludePaths)) {
+            Test-Directory -Path "${FundDirectory}" -Mask "${FundMask}" -StartsWith ""
+            return Get-SortedDirectory -Path $FundDirectory
+        }
     }
 }
 
