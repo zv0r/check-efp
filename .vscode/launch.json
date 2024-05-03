@@ -11,7 +11,7 @@
                 "\"E:\\1\\u1\"",
                 "-DestinationPath",
                 "\"E:\\1\\u2\",\"E:\\1\\u3\"",
-                "-ErrorLogPath",
+                "-LogPath",
                 "\"E:\\1\\check-efp-error.log\"",
                 "-ContinueOnError",
                 "-ExcludePaths",
