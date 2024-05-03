@@ -5,7 +5,7 @@
 
 .NOTES  
 Author: Andrey Zvorygin
-Version: 1.1.0 (2024-05-03) 
+Version: 1.1.1 (2024-05-03) 
 
 .PARAMETER Path
 Список каталогов, в которых находится ЭФП, который нужно проверить
@@ -203,7 +203,9 @@ function Test-Units {
     )
 
     Process {
-        if (-not ($UnitDirectory.BaseName -in $ExcludePaths)) {
+        if ($UnitDirectory.BaseName -in $ExcludePaths) {
+            Show-Check-Error -Message "Skip ${UnitDirectory}" -ForceContinue
+        } else {
             Test-Unit-In-Destination-Path -Path "${UnitDirectory}"
             Test-Directory -Path "${UnitDirectory}" -Mask "${UnitMask}" -StartsWith $UnitDirectory.Parent.BaseName
             Get-SortedDirectory -Path $UnitDirectory | Test-Images
@@ -218,7 +220,9 @@ function Test-Inventories {
     )
 
     Process {
-        if (-not ($InventoryDirectory.BaseName -in $ExcludePaths)) {
+        if ($InventoryDirectory.BaseName -in $ExcludePaths) {
+            Show-Check-Error -Message "Skip ${InventoryDirectory}" -ForceContinue
+        } else {
             Test-Directory -Path "${InventoryDirectory}" -Mask "${InventoryMask}" -StartsWith $InventoryDirectory.Parent.BaseName
             return Get-SortedDirectory -Path $InventoryDirectory
         }
@@ -232,7 +236,9 @@ function Test-Funds {
     )
 
     Process {
-        if (-not ($FundDirectory.BaseName -in $ExcludePaths)) {
+        if ($FundDirectory.BaseName -in $ExcludePaths) {
+            Show-Check-Error -Message "Skip ${FundDirectory}" -ForceContinue
+        } else {
             Test-Directory -Path "${FundDirectory}" -Mask "${FundMask}" -StartsWith ""
             return Get-SortedDirectory -Path $FundDirectory
         }
