@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "sign-script-file",
+            "command": "Set-AuthenticodeSignature",
+            "args": [
+                "-Certificate",
+                {
+                    "value": "(Get-ChildItem cert:\\CurrentUser\\TrustedPublisher -CodeSigningCert)[0]",
+                    "quoting": "weak"
+                },
+                "-FilePath",
+                {
+                    "value": "${workspaceFolder}\\check-efp.ps1",
+                    "quoting": "weak"
+                }
+            ],
+            "type": "shell",
+            "presentation": {
+                "reveal": "silent",
+                "close": true
+            }
+        }
+    ]
+}

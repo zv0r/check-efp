@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PowerShell: Launch Script GAYO",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}\\check-efp.ps1",
+            "args": [
+                "-Path",
+                "\"E:\\1\\u1\"",
+                "-DestinationPath",
+                "\"E:\\1\\u2\",\"E:\\1\\u3\"",
+                "-ErrorLogPath",
+                "\"E:\\1\\check-efp-error.log\"",
+                "-ContinueOnError",
+                "-Verbose"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "sign-script-file",
+            // "createTemporaryIntegratedConsole": true
+        }
+    ]
+}
